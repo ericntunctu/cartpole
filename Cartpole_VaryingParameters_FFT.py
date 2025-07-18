@@ -1,4 +1,3 @@
-import math
 import warnings
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,14 +5,13 @@ from gymnasium.envs.classic_control.cartpole import CartPoleEnv
 from scipy.fft import fft, fftfreq
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
-from sklearn.linear_model import LinearRegression
 
 warnings.filterwarnings('ignore')
 
 #基本訓練參數設定
 tau = 0.02 #時間步長
-total_episodes = 100 #訓練次數
-timesteps_per_episode = 5000 #訓練步數
+total_episodes = 50 #訓練次數
+timesteps_per_episode = 10 #訓練步數
 max_step_count = 500000 #總共執行步數
 
 #輸入參數
@@ -146,7 +144,7 @@ for length in Length:
 
                 # Step environment
                 obs, reward, terminated, truncated, info = test_env.step(action)
-                rewards_received.append(reward)
+                episode_rewards.append(reward)
                 total_reward += reward
                 done = terminated or truncated
 
