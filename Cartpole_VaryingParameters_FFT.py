@@ -15,8 +15,8 @@ timesteps_per_episode = 10 #訓練步數
 max_step_count = 500000 #總共執行步數
 
 #輸入參數
-Length = []
-Mass = []
+Length = [0.5]
+Mass = [0.05]
 Friction_coef = [0]
 
 #輸入Length
@@ -162,60 +162,60 @@ for length in Length:
             timestamps = np.array(timestamps)
             pole_tip_offsets = np.array(pole_tip_offsets)
 
-            # Performance analysis
-            pole_half_length = test_env.unwrapped.length
-            pole_full_length = pole_half_length * 2
-            zero_crossing_indices = np.where(np.diff(np.sign(pole_tip_offsets)) != 0)[0]
+            # # Performance analysis
+            # pole_half_length = test_env.unwrapped.length
+            # pole_full_length = pole_half_length * 2
+            # zero_crossing_indices = np.where(np.diff(np.sign(pole_tip_offsets)) != 0)[0]
 
-            # 加上 1，因為 np.diff 產生的是 N-1 長度
-            zero_crossing_times = timestamps[zero_crossing_indices + 1]
+            # # 加上 1，因為 np.diff 產生的是 N-1 長度
+            # zero_crossing_times = timestamps[zero_crossing_indices + 1]
 
-            # 假設你已有 zero_crossing_times，如：
-            # zero_crossing_times = np.array([...])
-            # Step 1: 取偶數 index 的過零時間點
-            even_crossing_times = zero_crossing_times[::2]
+            # # 假設你已有 zero_crossing_times，如：
+            # # zero_crossing_times = np.array([...])
+            # # Step 1: 取偶數 index 的過零時間點
+            # even_crossing_times = zero_crossing_times[::2]
 
-            # Step 2: 計算每個週期的時間長度
-            periods = np.diff(even_crossing_times)  # 相鄰時間差，應該接近週期
-            N = len(periods)
-            dt = 1  # 每個樣本對應一個週期，不需要真實時間尺度
+            # # Step 2: 計算每個週期的時間長度
+            # periods = np.diff(even_crossing_times)  # 相鄰時間差，應該接近週期
+            # N = len(periods)
+            # dt = 1  # 每個樣本對應一個週期，不需要真實時間尺度
 
-            if len(periods) < 2:
-                print(f"[Warning] Not enough zero crossings for length = {length}")
-                break
+            # if len(periods) < 2:
+            #     print(f"[Warning] Not enough zero crossings for length = {length}")
+            #     break
 
-            # Step 3: FFT 分析
-            yf = fft(periods - np.mean(periods))  # 去除 DC 分量 (均值)
-            xf = fftfreq(N, dt)
+            # # Step 3: FFT 分析
+            # yf = fft(periods - np.mean(periods))  # 去除 DC 分量 (均值)
+            # xf = fftfreq(N, dt)
 
-            # 只取正頻率部分
-            xf_pos = xf[:N // 2]
-            power_spectrum = np.abs(yf[:N // 2]) ** 2
+            # # 只取正頻率部分
+            # xf_pos = xf[:N // 2]
+            # power_spectrum = np.abs(yf[:N // 2]) ** 2
 
-            # 假設 you have periods = np.diff(even_crossing_times)
-            # periods = periods - np.mean(periods)  # 去掉均值
-            N = len(periods)
-            dt = 1  # index 間隔
-            xf = xf[:N // 2]
-            power = np.abs(yf[:N // 2]) ** 2
+            # # 假設 you have periods = np.diff(even_crossing_times)
+            # # periods = periods - np.mean(periods)  # 去掉均值
+            # N = len(periods)
+            # dt = 1  # index 間隔
+            # xf = xf[:N // 2]
+            # power = np.abs(yf[:N // 2]) ** 2
 
-            #繪圖
-            epsilon = 1e-12
-            log_xf = np.log(xf[1:] + epsilon)
-            log_power = np.log(power[1:] + epsilon)
+            # #繪圖
+            # epsilon = 1e-12
+            # log_xf = np.log(xf[1:] + epsilon)
+            # log_power = np.log(power[1:] + epsilon)
 
-            plt.figure(figsize=(8, 5))
-            plt.scatter(log_xf, log_power, s=10, alpha=0.7, label="Data")
+            # plt.figure(figsize=(8, 5))
+            # plt.scatter(log_xf, log_power, s=10, alpha=0.7, label="Data")
 
-            plt.xlabel("log(frequency)")
-            plt.ylabel("log(power)")
-            plt.title(f"PoleLength: {length}, PoleMass: {mass}, FrictionCoef: {friction_coef}")
-            plt.legend()
-            plt.grid(True)
-            plt.tight_layout()
+            # plt.xlabel("log(frequency)")
+            # plt.ylabel("log(power)")
+            # plt.title(f"PoleLength: {length}, PoleMass: {mass}, FrictionCoef: {friction_coef}")
+            # plt.legend()
+            # plt.grid(True)
+            # plt.tight_layout()
 
-            filename = f"PoleLength_{length}_PoleMass_{mass}_Friction_{friction_coef}.png"
-            plt.savefig(filename, dpi=300)
+            # filename = f"PoleLength_{length}_PoleMass_{mass}_Friction_{friction_coef}.png"
+            # plt.savefig(filename, dpi=300)
 
             recorded_data = {
                 'cart_positions': cart_positions,
