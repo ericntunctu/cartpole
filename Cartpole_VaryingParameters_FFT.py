@@ -12,8 +12,8 @@ warnings.filterwarnings('ignore')
 
 #基本訓練參數設定
 tau = 0.02 #時間步長
-total_episodes = 10 #訓練次數
-timesteps_per_episode = 5 #訓練步數
+total_episodes = 100 #訓練次數
+timesteps_per_episode = 5000 #訓練步數
 max_step_count = 500000 #總共執行步數
 
 #輸入參數
@@ -218,3 +218,21 @@ for length in Length:
 
             filename = f"PoleLength_{length}_PoleMass_{mass}_Friction_{friction_coef}.png"
             plt.savefig(filename, dpi=300)
+
+            recorded_data = {
+                'cart_positions': cart_positions,
+                'cart_velocities': cart_velocities,
+                'pole_angles': pole_angles,
+                'pole_angular_velocities': pole_angular_velocities,
+                'actions_taken': actions_taken,
+                'rewards_received': rewards_received,
+                'timestamps': timestamps,
+                'total_steps': step_count,
+                'total_reward': total_reward,
+                'pole_tip_offsets': pole_tip_offsets,
+                'episode_rewards': np.array(episode_rewards)
+            }
+
+            # Save data to numpy file
+            data_filename = f"PoleLength_{length}_PoleMass_{mass}_Friction_{friction_coef}.npz"
+            np.savez(data_filename, **recorded_data)
