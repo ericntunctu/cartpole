@@ -1,8 +1,6 @@
 import warnings
-import matplotlib.pyplot as plt
 import numpy as np
 from gymnasium.envs.classic_control.cartpole import CartPoleEnv
-from scipy.fft import fft, fftfreq
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 
@@ -11,12 +9,12 @@ warnings.filterwarnings('ignore')
 #基本訓練參數設定
 tau = 0.02 #時間步長
 total_episodes = 50 #訓練次數
-timesteps_per_episode = 10 #訓練步數
+timesteps_per_episode = 100 #訓練步數
 max_step_count = 500000 #總共執行步數
 
 #輸入參數
-Length = [0.5]
-Mass = [0.05]
+Length = []
+Mass = []
 Friction_coef = [0]
 
 #輸入Length
@@ -50,11 +48,11 @@ while True:
 class CartPoleWithVaryingParameters(CartPoleEnv):
     def __init__(self, length=1.0, mass=0.1, friction_coef=0.1, render_mode=None):
         super().__init__(render_mode=render_mode)
-        self.length = length / 2 # 設定桿長相關參數
+        self.length = length / 2 # 設定桿長
         self.masspole = mass # 設定桿質量
         self.polemass_length = self.masspole * self.length
         self.total_mass = self.masspole + self.masscart
-        self.friction_coef = friction_coef# 設定摩擦係數
+        self.friction_coef = friction_coef # 設定摩擦係數
         self.tau = tau
 
     def step(self, action):
@@ -62,16 +60,18 @@ class CartPoleWithVaryingParameters(CartPoleEnv):
         x, x_dot, theta, theta_dot = self.state
         # 地面摩擦力
         friction_force = -self.friction_coef * x_dot
-        force += friction_force
         costheta = np.cos(theta)
         sintheta = np.sin(theta)
-        temp = (force + self.polemass_length * theta_dot ** 2 * sintheta) / self.total_mass
-        thetaacc = (self.gravity * sintheta - costheta * temp) / \
-                   (self.length * (4.0 / 3.0 - self.masspole * costheta ** 2 / self.total_mass))
-        xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
-        x = x + self.tau * x_dot + 1 / 2 * xacc * self.tau ** 2
+
+        sgn = lambda x: abs(x)/x #定義sgn function
+
+        thetaacc = (self.gravity * sintheta + costheta * ((-force - 2 * self.polemass_length * theta_dot ** 2 * (sintheta + self.friction_coef * sgn(x_dot) * costheta)) / self.total_mass + self.friction_coef * self.gravity * sgn(x_dot))) / \
+                   (self.length * (4.0 / 3.0 - self.masspole * costheta (costheta - self.friction_coef * sgn(x_dot)) / self.total_mass))
+        N = self.total_mass * self.gravity - 2 * self.polemass_length * (thetaacc * sintheta + theta_dot**2 * costheta)
+        xacc = (force + 2 * self.polemass_length * (theta_dot**2 * sintheta - thetaacc * costheta) - self.friction_coef * N * sgn(x_dot)) / self.total_mass
+        x = x + self.tau * x_dot + 1/2 * xacc * self.tau ** 2
         x_dot = x_dot + self.tau * xacc
-        theta = theta + self.tau * theta_dot
+        theta = theta + self.tau * theta_dot + 1/2 * thetaacc * self.tau ** 2
         theta_dot = theta_dot + self.tau * thetaacc
         self.state = (x, x_dot, theta, theta_dot)
         terminated = x < -self.x_threshold \
@@ -161,61 +161,6 @@ for length in Length:
             rewards_received = np.array(rewards_received)
             timestamps = np.array(timestamps)
             pole_tip_offsets = np.array(pole_tip_offsets)
-
-            # # Performance analysis
-            # pole_half_length = test_env.unwrapped.length
-            # pole_full_length = pole_half_length * 2
-            # zero_crossing_indices = np.where(np.diff(np.sign(pole_tip_offsets)) != 0)[0]
-
-            # # 加上 1，因為 np.diff 產生的是 N-1 長度
-            # zero_crossing_times = timestamps[zero_crossing_indices + 1]
-
-            # # 假設你已有 zero_crossing_times，如：
-            # # zero_crossing_times = np.array([...])
-            # # Step 1: 取偶數 index 的過零時間點
-            # even_crossing_times = zero_crossing_times[::2]
-
-            # # Step 2: 計算每個週期的時間長度
-            # periods = np.diff(even_crossing_times)  # 相鄰時間差，應該接近週期
-            # N = len(periods)
-            # dt = 1  # 每個樣本對應一個週期，不需要真實時間尺度
-
-            # if len(periods) < 2:
-            #     print(f"[Warning] Not enough zero crossings for length = {length}")
-            #     break
-
-            # # Step 3: FFT 分析
-            # yf = fft(periods - np.mean(periods))  # 去除 DC 分量 (均值)
-            # xf = fftfreq(N, dt)
-
-            # # 只取正頻率部分
-            # xf_pos = xf[:N // 2]
-            # power_spectrum = np.abs(yf[:N // 2]) ** 2
-
-            # # 假設 you have periods = np.diff(even_crossing_times)
-            # # periods = periods - np.mean(periods)  # 去掉均值
-            # N = len(periods)
-            # dt = 1  # index 間隔
-            # xf = xf[:N // 2]
-            # power = np.abs(yf[:N // 2]) ** 2
-
-            # #繪圖
-            # epsilon = 1e-12
-            # log_xf = np.log(xf[1:] + epsilon)
-            # log_power = np.log(power[1:] + epsilon)
-
-            # plt.figure(figsize=(8, 5))
-            # plt.scatter(log_xf, log_power, s=10, alpha=0.7, label="Data")
-
-            # plt.xlabel("log(frequency)")
-            # plt.ylabel("log(power)")
-            # plt.title(f"PoleLength: {length}, PoleMass: {mass}, FrictionCoef: {friction_coef}")
-            # plt.legend()
-            # plt.grid(True)
-            # plt.tight_layout()
-
-            # filename = f"PoleLength_{length}_PoleMass_{mass}_Friction_{friction_coef}.png"
-            # plt.savefig(filename, dpi=300)
 
             recorded_data = {
                 'cart_positions': cart_positions,
