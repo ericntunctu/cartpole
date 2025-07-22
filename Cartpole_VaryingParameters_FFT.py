@@ -13,36 +13,36 @@ timesteps_per_episode = 100 #訓練步數
 max_step_count = 500000 #總共執行步數
 
 #輸入參數
-Length = []
-Mass = []
+Length = [0.1]
+Mass = [0.1]
 Friction_coef = [0]
 
-#輸入Length
-print("Length: ")
-while True:
-    x = float(input())
-    if x != 0:
-        Length.append(x)
-    else:
-        break
+# #輸入Length
+# print("Length: ")
+# while True:
+#     x = float(input())
+#     if x != 0:
+#         Length.append(x)
+#     else:
+#         break
 
-#輸入Mass
-print("Mass: ")
-while True:
-    x = float(input())
-    if x != 0:
-        Mass.append(x)
-    else:
-        break
+# #輸入Mass
+# print("Mass: ")
+# while True:
+#     x = float(input())
+#     if x != 0:
+#         Mass.append(x)
+#     else:
+#         break
 
-#輸入Friction_coef
-print("Friction_coef: ")
-while True:
-    x = float(input())
-    if x != 0:
-        Friction_coef.append(x)
-    else:
-        break
+# #輸入Friction_coef
+# print("Friction_coef: ")
+# while True:
+#     x = float(input())
+#     if x != 0:
+#         Friction_coef.append(x)
+#     else:
+#         break
 
 #Creat Enviorment
 class CartPoleWithVaryingParameters(CartPoleEnv):
@@ -66,7 +66,7 @@ class CartPoleWithVaryingParameters(CartPoleEnv):
         sgn = lambda x: abs(x)/x #定義sgn function
 
         thetaacc = (self.gravity * sintheta + costheta * ((-force - 2 * self.polemass_length * theta_dot ** 2 * (sintheta + self.friction_coef * sgn(x_dot) * costheta)) / self.total_mass + self.friction_coef * self.gravity * sgn(x_dot))) / \
-                   (self.length * (4.0 / 3.0 - self.masspole * costheta (costheta - self.friction_coef * sgn(x_dot)) / self.total_mass))
+                   (self.length * (4.0 / 3.0 - self.masspole * costheta*(costheta - self.friction_coef * sgn(x_dot)) / self.total_mass))
         N = self.total_mass * self.gravity - 2 * self.polemass_length * (thetaacc * sintheta + theta_dot**2 * costheta)
         xacc = (force + 2 * self.polemass_length * (theta_dot**2 * sintheta - thetaacc * costheta) - self.friction_coef * N * sgn(x_dot)) / self.total_mass
         x = x + self.tau * x_dot + 1/2 * xacc * self.tau ** 2
