@@ -1,0 +1,218 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import gymnasium as gym
+from Box2D import b2World, b2CircleShape, b2PolygonShape
+from matplotlib.animation import FuncAnimation
+from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import DummyVecEnv
+from gymnasium import spaces
+import warnings
+
+warnings.filterwarnings("ignore")
+
+max_step_count = 1000000
+
+class CartPole(gym.Env):
+    def __init__(self, Length = 2.0, Mass = 1.0):
+        # 創建世界
+        self.world = b2World(gravity=(0, -9.8))
+
+        # 創建地板
+        self.ground = self.world.CreateStaticBody(
+            position=(0, -1),
+            shapes=b2PolygonShape(box=(300,1))
+        )
+
+        # 創建Cart
+        self.Lc = 5 / 2 # Cart 長
+        self.Wc = 1 / 2 # Cart 寬
+        self.Cart = self.world.CreateDynamicBody(position=(0, self.Wc))
+        self.Cart.CreateFixture(
+            shape=b2PolygonShape(box=(self.Lc, self.Wc)),
+            density=1.0,
+            restitution=1,
+            friction = 0
+        )
+
+        # 創建Pole
+        self.Length = Length / 2
+        self.Mass = Mass
+        self.Wp = 0.05
+        Density = Mass / (Length * self.Wp)
+
+        # 初始化Pole位置
+        θ0 = np.pi / 2 - 0.05
+        dx = self.Length * np.cos(θ0)
+        dy = self.Length * np.sin(θ0)
+
+        Position = (dx, 2 * self.Wc + dy)
+
+        self.Pole = self.world.CreateDynamicBody(
+            position=Position,
+            angle=θ0
+        )
+        self.Pole.CreateFixture(
+            shape=b2PolygonShape(box=(self.Wp, self.Length)),
+            density=Density,
+            restitution=0,
+            friction = 0
+        )
+
+        self.joint = self.world.CreateRevoluteJoint(
+            bodyA=self.Cart,
+            bodyB=self.Pole,
+            anchor=(0, 2 * self.Wc)
+        )
+
+        self.force_mag = 5
+        self.τ = 0.01 / 2
+        self.steps_taken = 0
+        self.obs = []
+
+        high = np.array([
+            4.8,
+            0.209,
+            np.finfo(np.float32).max,
+            np.finfo(np.float32).max
+        ], dtype=np.float32)
+        self.observation_space = spaces.Box(-high, high, dtype=np.float32)
+
+        self.action_space = spaces.Box(
+            low=np.array([-self.force_mag], dtype=np.float32),
+            high=np.array([self.force_mag], dtype=np.float32),
+            shape=(1,),
+            dtype=np.float32
+        )
+
+    def step(self, action):
+        force = action[0]
+        self.Cart.ApplyForceToCenter((float(force), 0), wake=True)
+        self.world.Step(self.τ, 6, 2)
+        self.steps_taken += 1
+
+        x = self.Cart.position.x
+        θ = np.pi / 2 - self.Pole.angle
+        x_dot = self.Cart.linearVelocity.x
+        θ_dot = self.Pole.angularVelocity
+        observation = np.array([x, θ, x_dot, θ_dot])
+
+        angle_fail = np.abs(θ) > 0.209
+        pos_fail = np.abs(x) > 4.8
+        terminated = angle_fail or pos_fail
+        if terminated:
+            reward = -10
+        else:
+            reward = -np.log10(np.abs(θ) + 1e-12) + np.log10(0.209)
+        self.obs.append([x, θ])
+        return observation, reward, terminated, False, {"angle_fail": angle_fail, "pos_fail": pos_fail}
+
+    def reset(self, seed = None, option = None):
+        self.Cart.position = (0, 0.5)
+        self.Cart.linearVelocity = (0, 0)
+        self.Cart.angularVelocity = 0
+
+        θ0 = np.pi / 2 - 0.05
+        dx = self.Length * np.cos(θ0)
+        dy = self.Length * np.sin(θ0)
+
+        self.Pole.position = (dx, 2 * self.Wc + dy)
+        self.Pole.angle = θ0
+        self.Pole.linearVelocity = (0, 0)
+        self.Pole.angularVelocity = 0
+
+        x = self.Cart.position.x
+        θ = np.pi / 2 - self.Pole.angle
+        x_dot = self.Cart.linearVelocity.x
+        θ_dot = self.Pole.angularVelocity
+
+        initial_state = np.array([x, θ, x_dot, θ_dot], dtype=np.float32)
+
+        self.steps_taken = 0
+        self.obs = []
+        return initial_state, {}
+
+def create_env(Length, Mass):
+    return CartPole(Length, Mass)
+
+def Model_Training(length, mass, total_timesteps):
+    print(f"== Pole Length: {length}, Pole Mass: {mass} ==")
+    env = DummyVecEnv([lambda: create_env(length, mass)])
+    model = PPO("MlpPolicy", env, verbose=0, device="cpu", n_steps=500, ent_coef=0.02, learning_rate=1e-4)
+    print("Start Training")
+    model.learn(total_timesteps=total_timesteps, reset_num_timesteps=False)
+    print("Finished Training")
+    return model
+
+def Run(length, mass, model):
+    test_env = CartPole(length, mass)
+    obs, info = test_env.reset()
+
+    cart_positions = []
+    cart_velocities = []
+    pole_angles = []
+    pole_angular_velocities = []
+    Force = []
+    timestamps = []
+    terminated = False
+
+    for step in range(max_step_count):
+        timestamps.append(step * test_env.τ)
+        action, _states = model.predict(obs, deterministic=True)
+
+        obs, reward, terminated, truncated, info = test_env.step(action)
+
+        angle_fail = info["angle_fail"]
+        pos_fail = info["pos_fail"]
+
+        if angle_fail:
+            print("angle_fail at step ", step)
+        if pos_fail:
+            print("pos_fail at step ", step)
+
+        x = obs[0]
+        x_dot = obs[2]
+        θ = obs[1]
+        θ_dot = obs[3]
+        cart_positions.append(x)
+        cart_velocities.append(x_dot)
+        pole_angles.append(θ)
+        pole_angular_velocities.append(θ_dot)
+        Force.append(action)
+
+        if terminated:
+            print("本資料訓練失敗")
+            break
+
+    test_env.close()
+
+    data = {
+        "cart_positions": np.array(cart_positions),
+        "cart_velocities": np.array(cart_velocities),
+        "pole_angles": np.array(pole_angles),
+        "pole_angular_velocities": np.array(pole_angular_velocities),
+        "force": np.array(Force),
+        "timestamps": np.array(timestamps),
+    }
+
+    return data, step
+
+def function(length, mass, total_timesteps):
+    try:
+        Sum = 0
+        model = Model_Training(length,mass,total_timesteps)
+        data, step = Run(length,mass,model)
+    except Exception as e:
+        print("Fail: ",e)
+
+    return data, step
+
+Step = [500 * i for i in [10, 100, 500, 1000, 1500, 2000, 5000, 10000]]
+
+for step in Step:
+    print("timestep: ", step)
+    data, step = function(10, 1, step)
+    print(step)
+    angle = data["pole_angles"]
+    dot = data["pole_angular_velocities"]
+    print(angle)
+    print()
